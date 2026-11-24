@@ -29,6 +29,7 @@ public partial class KeyboardHeatmapWindow : Window
     private bool _isTransitionAnimating;
     private bool _suppressCalendarSelection;
     private bool _suppressAppSelection;
+    private StatsManager.KeyHistoryRange _selectedRange = StatsManager.KeyHistoryRange.Today;
     private string? _selectedAppName;
 
     private sealed class AppFilterOption
@@ -145,7 +146,7 @@ public partial class KeyboardHeatmapWindow : Window
         _endDate = bounds.End.Date;
         _selectedDate = ClampDate(_selectedDate);
 
-        var dayData = manager.GetKeyboardHeatmapDay(_selectedDate, _selectedAppName);
+        var dayData = manager.GetKeyboardHeatmapRange(_selectedRange, _selectedDate, _selectedAppName);
         _selectedAppName = dayData.SelectedAppName;
         UpdateAppFilter(dayData);
         var visibleCounts = dayData.KeyCounts
@@ -157,12 +158,16 @@ public partial class KeyboardHeatmapWindow : Window
         var totalFormatted = dayData.TotalKeyPresses.ToString("N0", CultureInfo.CurrentCulture);
         var activeFormatted = activeKeys.ToString("N0", CultureInfo.CurrentCulture);
         SummaryText.Text = string.Format(CultureInfo.CurrentCulture, KeyStats.Properties.Strings.Heatmap_SummaryFormat, totalFormatted, activeFormatted);
-        DateText.Text = DisplayDateString(_selectedDate);
+        DateText.Text = dayData.StartDate == dayData.EndDate
+            ? DisplayDateString(_selectedDate)
+            : $"{DisplayDateString(dayData.StartDate)} – {DisplayDateString(dayData.EndDate)}";
 
         var hasActivity = visibleCounts.Values.Any(value => value > 0);
-        EmptyBadgeText.Text = _selectedAppName == null
-            ? KeyStats.Properties.Strings.Heatmap_NoData
-            : KeyStats.Properties.Strings.Heatmap_NoAppData;
+        EmptyBadgeText.Text = _selectedAppName != null
+            ? KeyStats.Properties.Strings.Heatmap_NoAppData
+            : _selectedRange == StatsManager.KeyHistoryRange.Today
+                ? KeyStats.Properties.Strings.Heatmap_NoData
+                : KeyStats.Properties.Strings.KeyHistory_Empty;
         EmptyOverlay.Visibility = hasActivity ? Visibility.Collapsed : Visibility.Visible;
         EmptyBadge.Visibility = hasActivity ? Visibility.Collapsed : Visibility.Visible;
 
@@ -194,6 +199,27 @@ public partial class KeyboardHeatmapWindow : Window
         {
             _suppressAppSelection = false;
         }
+    }
+
+    private void HeatmapRange_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not RadioButton { Tag: string tag }) return;
+
+        var range = tag switch
+        {
+            "Week" => StatsManager.KeyHistoryRange.Week,
+            "Month" => StatsManager.KeyHistoryRange.Month,
+            "All" => StatsManager.KeyHistoryRange.All,
+            _ => StatsManager.KeyHistoryRange.Today
+        };
+        if (_selectedRange == range) return;
+
+        _selectedRange = range;
+        App.CurrentApp?.TrackClick("keyboard_heatmap_range_filter", new Dictionary<string, object?>
+        {
+            ["range"] = tag.ToLowerInvariant()
+        });
+        RefreshData();
     }
 
     private void AppFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -242,9 +268,10 @@ public partial class KeyboardHeatmapWindow : Window
     private void UpdateNavigationState()
     {
         var today = DateTime.Today;
-        PrevDayButton.IsEnabled = _selectedDate > _startDate;
-        NextDayButton.IsEnabled = _selectedDate < _endDate;
-        BackToTodayButton.Visibility = _selectedDate == today ? Visibility.Collapsed : Visibility.Visible;
+        var isSingleDay = _selectedRange == StatsManager.KeyHistoryRange.Today;
+        PrevDayButton.IsEnabled = isSingleDay && _selectedDate > _startDate;
+        NextDayButton.IsEnabled = isSingleDay && _selectedDate < _endDate;
+        BackToTodayButton.Visibility = isSingleDay && _selectedDate != today ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void UpdateDatePickerState()
@@ -282,7 +309,7 @@ public partial class KeyboardHeatmapWindow : Window
             _suppressCalendarSelection = false;
         }
 
-        DatePickerButton.IsEnabled = minDate <= maxDate;
+        DatePickerButton.IsEnabled = _selectedRange == StatsManager.KeyHistoryRange.Today && minDate <= maxDate;
     }
 
     private void OpenDatePicker_Click(object sender, RoutedEventArgs e)

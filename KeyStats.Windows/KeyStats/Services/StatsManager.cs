@@ -1384,6 +1384,8 @@ public class StatsManager : IDisposable
     public sealed class KeyboardHeatmapDay
     {
         public DateTime Date { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
         public int TotalKeyPresses { get; set; }
         public Dictionary<string, int> KeyCounts { get; set; } = new(StringComparer.Ordinal);
         public List<AppStats> Apps { get; set; } = new();
@@ -1464,8 +1466,55 @@ public class StatsManager : IDisposable
             return new KeyboardHeatmapDay
             {
                 Date = normalizedDate,
+                StartDate = normalizedDate,
+                EndDate = normalizedDate,
                 TotalKeyPresses = Math.Max(0, selectedApp?.KeyPresses ?? daily.KeyPresses),
                 KeyCounts = aggregated,
+                Apps = apps,
+                SelectedAppName = selectedApp?.AppName
+            };
+        }
+    }
+
+    public KeyboardHeatmapDay GetKeyboardHeatmapRange(KeyHistoryRange range, DateTime date, string? appName = null)
+    {
+        if (range == KeyHistoryRange.Today)
+        {
+            return GetKeyboardHeatmapDay(date, appName);
+        }
+
+        lock (_lock)
+        {
+            var today = DateTime.Today;
+            var dates = GetDatesInKeyHistoryRange(range);
+            var keyCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var totals = new Dictionary<string, AppStats>(StringComparer.OrdinalIgnoreCase);
+            var totalKeyPresses = 0;
+
+            foreach (var day in dates)
+            {
+                var daily = GetDailyStats(day);
+                totalKeyPresses = SafeAdd(totalKeyPresses, Math.Max(0, daily.KeyPresses));
+                MergeKeyCounts(daily.KeyPressCounts, keyCounts);
+                MergeAppStats(daily, totals);
+            }
+
+            var apps = totals.Values
+                .Where(app => app.KeyPresses > 0 || app.KeyPressCounts.Count > 0)
+                .OrderByDescending(app => app.KeyPresses)
+                .ThenBy(app => app.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(app => app.AppName, StringComparer.Ordinal)
+                .Select(app => new AppStats(app))
+                .ToList();
+            var selectedApp = apps.FirstOrDefault(app => string.Equals(app.AppName, appName, StringComparison.OrdinalIgnoreCase));
+
+            return new KeyboardHeatmapDay
+            {
+                Date = today,
+                StartDate = dates.Count > 0 ? dates[0] : today,
+                EndDate = dates.Count > 0 ? dates[dates.Count - 1] : today,
+                TotalKeyPresses = Math.Max(0, selectedApp?.KeyPresses ?? totalKeyPresses),
+                KeyCounts = AggregateKeyboardHeatmapCounts(selectedApp?.KeyPressCounts ?? keyCounts),
                 Apps = apps,
                 SelectedAppName = selectedApp?.AppName
             };
@@ -1779,6 +1828,7 @@ public class StatsManager : IDisposable
             }
 
             total.KeyPresses += source.KeyPresses;
+            MergeKeyCounts(source.KeyPressCounts, total.KeyPressCounts);
             total.LeftClicks += source.LeftClicks;
             total.RightClicks += source.RightClicks;
             total.MiddleClicks += source.MiddleClicks;

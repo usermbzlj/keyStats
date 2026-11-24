@@ -114,6 +114,111 @@ public sealed class StatsPersistenceTests
     }
 
     [TestMethod]
+    public void KeyboardHeatmap_RangesAggregateGlobalAndAppCounts()
+    {
+        var today = DateTime.Today;
+        var yesterday = today.AddDays(-1);
+        var eightDaysAgo = today.AddDays(-8);
+        var fortyDaysAgo = today.AddDays(-40);
+        var current = new DailyStats(today)
+        {
+            KeyPresses = 3,
+            KeyPressCounts = new Dictionary<string, int> { ["Ctrl+C"] = 1, ["Space"] = 1, ["A"] = 1 },
+            AppStats = new Dictionary<string, AppStats>
+            {
+                ["editor"] = new AppStats("editor", "Editor")
+                {
+                    KeyPresses = 2,
+                    KeyPressCounts = new Dictionary<string, int> { ["Ctrl+C"] = 1, ["Space"] = 1 }
+                },
+                ["browser"] = new AppStats("browser", "Browser")
+                {
+                    KeyPresses = 1,
+                    KeyPressCounts = new Dictionary<string, int> { ["A"] = 1 }
+                }
+            }
+        };
+        var manager = CreateHeatmapManager(current);
+        manager.History[yesterday.ToString("yyyy-MM-dd")] = new DailyStats(yesterday)
+        {
+            KeyPresses = 4,
+            KeyPressCounts = new Dictionary<string, int> { ["Space"] = 2, ["B"] = 2 },
+            AppStats = new Dictionary<string, AppStats>
+            {
+                ["editor"] = new AppStats("editor", "Editor")
+                {
+                    KeyPresses = 2,
+                    KeyPressCounts = new Dictionary<string, int> { ["Space"] = 1, ["B"] = 1 }
+                }
+            }
+        };
+        manager.History[eightDaysAgo.ToString("yyyy-MM-dd")] = new DailyStats(eightDaysAgo)
+        {
+            KeyPresses = 5,
+            KeyPressCounts = new Dictionary<string, int> { ["A"] = 5 },
+            AppStats = new Dictionary<string, AppStats>
+            {
+                ["editor"] = new AppStats("editor", "Editor")
+                {
+                    KeyPresses = 5,
+                    KeyPressCounts = new Dictionary<string, int> { ["A"] = 5 }
+                }
+            }
+        };
+        manager.History[fortyDaysAgo.ToString("yyyy-MM-dd")] = new DailyStats(fortyDaysAgo)
+        {
+            KeyPresses = 7,
+            KeyPressCounts = new Dictionary<string, int> { ["C"] = 7 },
+            AppStats = new Dictionary<string, AppStats>
+            {
+                ["browser"] = new AppStats("browser", "Browser")
+                {
+                    KeyPresses = 7,
+                    KeyPressCounts = new Dictionary<string, int> { ["C"] = 7 }
+                }
+            }
+        };
+
+        var single = manager.GetKeyboardHeatmapRange(StatsManager.KeyHistoryRange.Today, yesterday);
+        Assert.AreEqual(4, single.TotalKeyPresses);
+        Assert.AreEqual(yesterday, single.StartDate);
+        Assert.AreEqual(yesterday, single.EndDate);
+
+        var week = manager.GetKeyboardHeatmapRange(StatsManager.KeyHistoryRange.Week, today);
+        Assert.AreEqual(7, week.TotalKeyPresses);
+        Assert.AreEqual(today.AddDays(-6), week.StartDate);
+        Assert.AreEqual(today, week.EndDate);
+        Assert.AreEqual(3, week.KeyCounts["Space"]);
+        Assert.AreEqual(1, week.KeyCounts["Ctrl"]);
+        Assert.AreEqual(1, week.KeyCounts["C"]);
+        Assert.AreEqual(2, week.KeyCounts["B"]);
+        Assert.AreEqual(1, week.KeyCounts["A"]);
+        CollectionAssert.AreEqual(new[] { "editor", "browser" }, week.Apps.Select(app => app.AppName).ToArray());
+
+        var editorWeek = manager.GetKeyboardHeatmapRange(StatsManager.KeyHistoryRange.Week, today, "EDITOR");
+        Assert.AreEqual("editor", editorWeek.SelectedAppName);
+        Assert.AreEqual(4, editorWeek.TotalKeyPresses);
+        Assert.AreEqual(2, editorWeek.KeyCounts["Space"]);
+        Assert.AreEqual(1, editorWeek.KeyCounts["B"]);
+        Assert.AreEqual(1, editorWeek.KeyCounts["Ctrl"]);
+        Assert.IsFalse(editorWeek.KeyCounts.ContainsKey("A"));
+
+        var month = manager.GetKeyboardHeatmapRange(StatsManager.KeyHistoryRange.Month, today);
+        Assert.AreEqual(12, month.TotalKeyPresses);
+        Assert.AreEqual(6, month.KeyCounts["A"]);
+
+        var all = manager.GetKeyboardHeatmapRange(StatsManager.KeyHistoryRange.All, today);
+        Assert.AreEqual(19, all.TotalKeyPresses);
+        Assert.AreEqual(fortyDaysAgo, all.StartDate);
+        Assert.AreEqual(8, all.KeyCounts["C"]);
+
+        var editorAll = manager.GetKeyboardHeatmapRange(StatsManager.KeyHistoryRange.All, today, "editor");
+        Assert.AreEqual(9, editorAll.TotalKeyPresses);
+        Assert.AreEqual(5, editorAll.KeyCounts["A"]);
+        Assert.AreEqual(2, editorAll.KeyCounts["Space"]);
+    }
+
+    [TestMethod]
     public void AppKeyDistribution_ImportMergeNormalizesAndCombinesCounts()
     {
         var existing = new DailyStats(DateTime.Today);

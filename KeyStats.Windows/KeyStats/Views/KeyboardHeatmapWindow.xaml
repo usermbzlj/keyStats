@@ -256,6 +256,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock x:Name="TitleText"
@@ -270,9 +271,47 @@
                            TextTrimming="CharacterEllipsis"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
             </StackPanel>
+            <Border Grid.Column="1"
+                    Background="{DynamicResource SubtleFillBrush}"
+                    CornerRadius="6"
+                    Padding="3"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton Content="{x:Static p:Strings.History_Range_Today}"
+                                 GroupName="HeatmapRange"
+                                 Tag="Today"
+                                 Style="{DynamicResource SegmentedButton}"
+                                 FontSize="11"
+                                 Padding="10,4"
+                                 IsChecked="True"
+                                 Click="HeatmapRange_Click"/>
+                    <RadioButton Content="{x:Static p:Strings.History_Range_Last7Days}"
+                                 GroupName="HeatmapRange"
+                                 Tag="Week"
+                                 Style="{DynamicResource SegmentedButton}"
+                                 FontSize="11"
+                                 Padding="10,4"
+                                 Click="HeatmapRange_Click"/>
+                    <RadioButton Content="{x:Static p:Strings.History_Range_Last30Days}"
+                                 GroupName="HeatmapRange"
+                                 Tag="Month"
+                                 Style="{DynamicResource SegmentedButton}"
+                                 FontSize="11"
+                                 Padding="10,4"
+                                 Click="HeatmapRange_Click"/>
+                    <RadioButton Content="{x:Static p:Strings.History_Range_All}"
+                                 GroupName="HeatmapRange"
+                                 Tag="All"
+                                 Style="{DynamicResource SegmentedButton}"
+                                 FontSize="11"
+                                 Padding="10,4"
+                                 Click="HeatmapRange_Click"/>
+                </StackPanel>
+            </Border>
             <ComboBox x:Name="AppFilterComboBox"
                       Style="{StaticResource HeatmapAppFilterStyle}"
-                      Grid.Column="1"
+                      Grid.Column="2"
                       Width="240"
                       Margin="16,0,0,0"
                       VerticalAlignment="Center"

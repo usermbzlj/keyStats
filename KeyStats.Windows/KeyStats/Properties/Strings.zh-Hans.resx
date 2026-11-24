@@ -192,7 +192,7 @@
 
   <data name="Heatmap_WindowTitle" xml:space="preserve"><value>键盘热力图</value></data>
   <data name="Heatmap_HeaderTitle" xml:space="preserve"><value>键盘热力图</value></data>
-  <data name="Heatmap_HeaderSubtitle" xml:space="preserve"><value>完整虚拟键盘视图，按天展示按键热度。</value></data>
+  <data name="Heatmap_HeaderSubtitle" xml:space="preserve"><value>完整虚拟键盘视图，按单日或日期范围展示按键热度。</value></data>
   <data name="Heatmap_PrevDay" xml:space="preserve"><value>上一天</value></data>
   <data name="Heatmap_NextDay" xml:space="preserve"><value>下一天</value></data>
   <data name="Heatmap_BackToToday" xml:space="preserve"><value>回到今天</value></data>
